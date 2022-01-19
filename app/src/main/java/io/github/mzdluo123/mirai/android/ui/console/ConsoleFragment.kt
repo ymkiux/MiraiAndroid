@@ -90,6 +90,9 @@ class ConsoleFragment : Fragment() {
             }
             return@setOnEditorActionListener false
         }
+    }
+
+    private fun refreshLog() {
         // 将新的log显示到屏幕
         conn.registerConsole(object : IConsole.Stub() {
             override fun newLog(log: String) {
@@ -108,12 +111,14 @@ class ConsoleFragment : Fragment() {
             }
         })
         // 首次启动加载缓存中的log
-        conn.connectStatus.observe(viewLifecycleOwner, Observer {
+        conn.connectStatus.observe(viewLifecycleOwner, {
             Log.d(TAG, "service status $it")
             if (it) {
                 lifecycleScope.launch(Dispatchers.Default) {
-                    val text = conn.botService.log.joinToString(separator = "<br>")
+                    var text = conn.botService.log.joinToString(separator = "<br>")
                     withContext(Dispatchers.Main) {
+                        text = text.replace("null<br>null<br>", "").replace("\n", "")
+                            .replace("null", "").trim()
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                             log_text?.text = Html.fromHtml(text, Html.FROM_HTML_MODE_COMPACT)
                         } else {
@@ -131,7 +136,7 @@ class ConsoleFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        startLoadAvatar()
+        startLoadAvatarAndLog()
     }
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
@@ -192,16 +197,16 @@ class ConsoleFragment : Fragment() {
     private fun submitCmd() {
         var command = command_input.text.toString()
 
-            if (!command.startsWith("/")) {
-                command = "/$command"
+        if (!command.startsWith("/")) {
+            command = "/$command"
+        }
+        try {
+            lifecycleScope.launch(Dispatchers.Default) {
+                conn.botService.runCmd(command)
             }
-            try {
-                lifecycleScope.launch(Dispatchers.Default) {
-                    conn.botService.runCmd(command)
-                }
-                command_input.text.clear()
-            } catch (e: DeadObjectException) {
-                toast("服务状态异常，请在菜单内点击快速重启")
+            command_input.text.clear()
+        } catch (e: DeadObjectException) {
+            toast("服务状态异常，请在菜单内点击快速重启")
         }
 
     }
@@ -231,34 +236,10 @@ class ConsoleFragment : Fragment() {
         dialog.show()
     }
 
-//    private fun startRefreshLoop() {
-//        if (!conn.connectStatus.value!!) {
-//            return
-//        }
-//        logRefreshJob = viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Default) {
-//            log_text?.clearComposingText()
-//            try {
-//                withContext(Dispatchers.Main) { Log.d(TAG, "start loop") }
-//                while (isActive) {
-//                    val text = conn.botService.log.joinToString(separator = "\n")
-//                    withContext(Dispatchers.Main) {
-//                        log_text?.text = text
-//                        if (autoScroll) {
-//                            main_scroll.fullScroll(ScrollView.FOCUS_DOWN)
-//                        }
-//                    }
-//                    delay(200)
-//                }
-//            } catch (e: DeadObjectException) {
-//                // ignore
-//            }
-//            withContext(Dispatchers.Main) { log_text?.append("\n无法连接到服务，可能是正在重启") }
-//        }
-//    }
-
-    private fun startLoadAvatar() {
+    private fun startLoadAvatarAndLog() {
         viewLifecycleOwner.lifecycleScope.launch {
             while (true) {
+                refreshLog()
                 try {
                     val id = conn.botService.logonId
                     if (id != 0L) {
@@ -307,14 +288,6 @@ class ConsoleFragment : Fragment() {
             toString()
         }
     }
-
-//    private fun restart() = viewLifecycleOwner.lifecycleScope.launch {
-//        conn.disconnect()
-//        BotApplication.context.stopBotService()
-//        delay(200)
-//        BotApplication.context.startBotService()
-//        conn.connect()
-//    }
 
 }
 

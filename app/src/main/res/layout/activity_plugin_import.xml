@@ -162,13 +162,13 @@
                 android:id="@+id/compile_radioButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:checked="true"
                 android:text="编译并安装" />
 
             <RadioButton
                 android:id="@+id/copy_radioButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:checked="true"
                 android:text="仅安装" />
         </RadioGroup>
 
